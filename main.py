@@ -20,7 +20,7 @@ class CategoriaConfig:
     def __init__(self, nome):
         self.nome = nome
         self.caminho = ""
-        self.tipo = tk.StringVar(value="subpasta")  # "subpasta" ou "nova_pasta"
+        self.tipo = tk.StringVar(value="subpasta")  
 
 def escolher_destino(cat_config):
     pasta = filedialog.askdirectory(title=f"Escolha o destino para {cat_config.nome}")
@@ -137,7 +137,6 @@ entrada_origem = tk.StringVar()
 configs = {cat: CategoriaConfig(cat) for cat in categorias}
 campos_caminho = {}
 
-# Mensagem de boas-vindas grande e centralizada
 welcome_frame = ctk.CTkFrame(root, fg_color="transparent")
 welcome_frame.pack(pady=25)
 ctk.CTkLabel(
@@ -161,7 +160,6 @@ ctk.CTkLabel(frame_origem, text="Pasta a organizar:", font=("Arial", 14)).pack(s
 ctk.CTkEntry(frame_origem, textvariable=entrada_origem, width=350, font=("Arial", 13)).pack(side=tk.LEFT, padx=5)
 ctk.CTkButton(frame_origem, text="Escolher", command=escolher_pasta_origem).pack(side=tk.LEFT, padx=5)
 
-# Frame para configuração das categorias
 frame_categorias = ctk.CTkFrame(root)
 frame_categorias.pack(padx=10, pady=10, fill="x")
 ctk.CTkLabel(
@@ -180,14 +178,12 @@ for cat in categorias:
     ctk.CTkRadioButton(frame, text="Subpasta", variable=configs[cat].tipo, value="subpasta").pack(side=tk.LEFT, padx=2)
     ctk.CTkRadioButton(frame, text="Nova pasta", variable=configs[cat].tipo, value="nova_pasta").pack(side=tk.LEFT, padx=2)
 
-# Adicione a barra de progresso global
 progress_var = tk.DoubleVar(value=0)
 
 progress_bar = ctk.CTkProgressBar(root, variable=progress_var, width=500, height=20)
 progress_bar.pack(pady=10)
 progress_bar.set(0)
 
-# Botão para iniciar organização
 ctk.CTkButton(
     root,
     text="Organizar arquivos",
