@@ -1,11 +1,11 @@
 import os
 import shutil
 import tkinter as tk
-from tkinter import filedialog, messagebox
-import customtkinter as ctk  
+from tkinter import messagebox
+import customtkinter as ctk
 import tempfile
 
-# Dicionário de categorias e extensões
+# Categorias e extensões
 categorias = {
     "Imagens": [".jpg", ".jpeg", ".png", ".gif", ".bmp"],
     "Documentos": [".pdf", ".docx", ".txt", ".xlsx"],
@@ -16,195 +16,165 @@ categorias = {
     "Outros": []
 }
 
-class CategoriaConfig:
-    def __init__(self, nome):
-        self.nome = nome
-        self.caminho = ""
-        self.tipo = tk.StringVar(value="subpasta")  
+class OrganizadorApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Organizador de Arquivos Automático")
+        self.root.geometry("720x700")
+        ctk.set_appearance_mode("system")
+        ctk.set_default_color_theme("blue")
 
-def escolher_destino(cat_config):
-    pasta = filedialog.askdirectory(title=f"Escolha o destino para {cat_config.nome}")
-    if pasta:
-        cat_config.caminho = pasta
-        campos_caminho[cat_config.nome].configure(text=pasta)
+        # Caminhos fixos: Downloads como origem, subpasta como destino
+        downloads = os.path.join(os.path.expanduser("~"), "Downloads")
+        self.pasta_origem = downloads
+        self.pasta_destino = os.path.join(downloads, "Organizados")
 
-def organizar_pasta(pasta_origem, configs):
-    arquivos = [f for f in os.listdir(pasta_origem) if os.path.isfile(os.path.join(pasta_origem, f))]
-    total = len(arquivos)
-    contagem = {cat: 0 for cat in categorias}
-    for idx, arquivo in enumerate(arquivos, 1):
-        caminho_arquivo = os.path.join(pasta_origem, arquivo)
-        _, extensao = os.path.splitext(arquivo)
-        categoria = "Outros"
-        for cat, extensoes in categorias.items():
-            if extensao.lower() in extensoes:
-                categoria = cat
-                break
-        config = configs[categoria]
-        if config.tipo.get() == "subpasta":
-            destino = os.path.join(config.caminho, categoria)
-        else:
-            destino = config.caminho
-        if not os.path.exists(destino):
-            os.makedirs(destino)
-        try:
-            shutil.move(caminho_arquivo, os.path.join(destino, arquivo))
-            contagem[categoria] += 1
-        except Exception as e:
-            print(f'Erro ao mover {arquivo}: {e}')
-        # Atualiza a barra de progresso
-        progress = idx / total if total > 0 else 1
-        progress_var.set(progress)
-        root.update_idletasks()
-    progress_var.set(0)
-    resumo = "\nResumo da organização:\n"
-    for cat, qtd in contagem.items():
-        resumo += f"{cat}: {qtd} arquivo(s) movido(s)\n"
-    return resumo
+        self.status_var = tk.StringVar(value="Aguardando ação...")
+        self.log_text = None
 
-def escolher_pasta_origem():
-    pasta = filedialog.askdirectory(title="Selecione a pasta para organizar")
-    if pasta:
-        entrada_origem.set(pasta)
+        self._build_interface()
 
-def iniciar_organizacao():
-    pasta_origem = entrada_origem.get()
-    if not pasta_origem or not os.path.isdir(pasta_origem):
-        messagebox.showerror("Erro", "Selecione uma pasta de origem válida.")
-        return
-    for cat, config in configs.items():
-        if not config.caminho:
-            messagebox.showerror("Erro", f"Escolha o destino para {cat}.")
+    def _build_interface(self):
+        # Botão organizar
+        ctk.CTkButton(
+            self.root,
+            text="Organizar automaticamente (Downloads)",
+            command=self.iniciar_organizacao,
+            font=("Arial", 18, "bold"),
+            fg_color="#2563eb",
+            hover_color="#18e733",
+            height=45,
+            width=350
+        ).pack(pady=15)
+
+        # Status label
+        self.status_label = ctk.CTkLabel(self.root, textvariable=self.status_var, font=("Arial", 14, "italic"), text_color="#666")
+        self.status_label.pack(pady=5)
+
+        # Campo log (Text widget)
+        log_frame = ctk.CTkFrame(self.root)
+        log_frame.pack(pady=10, padx=10, fill="both", expand=True)
+        ctk.CTkLabel(log_frame, text="Log de Ações:", font=("Arial", 16, "bold")).pack(anchor="w", pady=5)
+        self.log_text = tk.Text(log_frame, height=15, state="disabled", font=("Consolas", 11))
+        self.log_text.pack(fill="both", expand=True)
+
+        # Botão limpar log
+        ctk.CTkButton(self.root, text="Limpar log", command=self.limpar_log, width=120).pack(pady=5)
+
+        # Botão limpar temporários
+        ctk.CTkButton(
+            self.root,
+            text="Limpar arquivos temporários",
+            command=self.limpar_temporarios,
+            font=("Arial", 15, "bold"),
+            fg_color="#eab308",
+            hover_color="#ca8a04",
+            height=40,
+            width=220
+        ).pack(pady=5)
+
+    def log(self, texto):
+        self.status_var.set(texto)
+        self.log_text.config(state="normal")
+        self.log_text.insert(tk.END, texto + "\n")
+        self.log_text.see(tk.END)
+        self.log_text.config(state="disabled")
+        self.root.update_idletasks()
+
+    def organizar_pasta(self):
+        origem = self.pasta_origem
+        destino_base = self.pasta_destino
+
+        if not os.path.isdir(origem):
+            messagebox.showerror("Erro", "A pasta de Downloads não foi encontrada.")
             return
-    resultado = organizar_pasta(pasta_origem, configs)
-    messagebox.showinfo("Organização concluída", resultado)
 
-# Função para limpar arquivos temporários
-def limpar_temporarios():
-    pastas = [ 
-        tempfile.gettempdir(), 
-        r"C:\Windows\Temp",
-        os.path.expandvars(r"%USERPROFILE%\AppData\Local\Temp")
-    ]
-    arquivos_removidos = 0 
-    removidos = []
-    # Conta total de arquivos/pastas para a barra de progresso
-    total = 0
-    for pasta in pastas:
-        if not os.path.exists(pasta):
-            continue
-        total += len(os.listdir(pasta))
-    atual = 0
-    for pasta in pastas: 
-        if not os.path.exists(pasta):
-            continue 
-        for arquivo in os.listdir(pasta):
-            caminho_completo = os.path.join(pasta, arquivo)
+        if not os.path.exists(destino_base):
+            os.makedirs(destino_base)
+
+        arquivos = [f for f in os.listdir(origem) if os.path.isfile(os.path.join(origem, f))]
+        total = len(arquivos)
+        contagem = {cat: 0 for cat in categorias}
+
+        if total == 0:
+            self.log("Nenhum arquivo encontrado para organizar.")
+            return
+
+        for idx, arquivo in enumerate(arquivos, 1):
+            caminho_arquivo = os.path.join(origem, arquivo)
+            _, ext = os.path.splitext(arquivo)
+            categoria = "Outros"
+            for cat, exts in categorias.items():
+                if ext.lower() in exts:
+                    categoria = cat
+                    break
+            destino_cat = os.path.join(destino_base, categoria)
+            if not os.path.exists(destino_cat):
+                os.makedirs(destino_cat)
             try:
-                if os.path.isfile(caminho_completo):
-                    os.remove(caminho_completo)
-                    arquivos_removidos += 1 
-                    removidos.append(arquivo)
-                elif os.path.isdir(caminho_completo):
-                    shutil.rmtree(caminho_completo)
-                    arquivos_removidos += 1     
-                    removidos.append(arquivo + "/")
+                shutil.move(caminho_arquivo, os.path.join(destino_cat, arquivo))
+                contagem[categoria] += 1
+                self.log(f"[{idx}/{total}] Movido '{arquivo}' para '{destino_cat}'")
             except Exception as e:
-                print(f"Erro ao deletar {caminho_completo}: {e}")
-            # Atualiza a barra de progresso
-            atual += 1
-            progress = atual / total if total > 0 else 1
-            progress_var.set(progress)
-            root.update_idletasks()
-    progress_var.set(0)
-    if arquivos_removidos == 0:
-        mensagem = "Nenhum arquivo ou pasta temporária foi removido."
-    else:
-        mensagem = f"Foram removidos {arquivos_removidos} arquivos/pastas temporários:\n\n"
-        mensagem += "\n".join(removidos)
-    messagebox.showinfo("Limpeza concluída", mensagem)
+                self.log(f"Erro ao mover '{arquivo}': {e}")
 
-# Configura o tema do customtkinter
-ctk.set_appearance_mode("system")
-ctk.set_default_color_theme("blue")
+        resumo = "Organização concluída:\n"
+        for cat, qtd in contagem.items():
+            resumo += f"  {cat}: {qtd} arquivo(s) movido(s)\n"
+        self.log(resumo)
 
-# Cria a janela principal
-root = ctk.CTk()
-root.title("Organizador de Arquivos Avançado")
-root.geometry("700x600")
+    def iniciar_organizacao(self):
+        self.log("Iniciando organização automática na pasta Downloads...")
+        self.organizar_pasta()
 
-entrada_origem = tk.StringVar()
-configs = {cat: CategoriaConfig(cat) for cat in categorias}
-campos_caminho = {}
+    def limpar_log(self):
+        self.log_text.config(state="normal")
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.config(state="disabled")
+        self.status_var.set("Log limpo.")
 
-welcome_frame = ctk.CTkFrame(root, fg_color="transparent")
-welcome_frame.pack(pady=25)
-ctk.CTkLabel(
-    welcome_frame,
-    text="👋 Bem-vindo ao Organizador de Arquivos!",
-    font=("Arial", 28, "bold"),
-    text_color="#3370f3"
-).pack(pady=10)
+    def limpar_temporarios(self):
+        self.log("Iniciando limpeza de arquivos temporários...")
+        pastas = [ 
+            tempfile.gettempdir(), 
+            r"C:\Windows\Temp",
+            os.path.expandvars(r"%USERPROFILE%\AppData\Local\Temp")
+        ]
+        arquivos_removidos = 0
+        removidos = []
+        total = 0
+        for pasta in pastas:
+            if not os.path.exists(pasta):
+                continue
+            total += len(os.listdir(pasta))
+        atual = 0
+        for pasta in pastas:
+            if not os.path.exists(pasta):
+                continue
+            for arquivo in os.listdir(pasta):
+                caminho = os.path.join(pasta, arquivo)
+                try:
+                    if os.path.isfile(caminho):
+                        os.remove(caminho)
+                        arquivos_removidos += 1
+                        removidos.append(arquivo)
+                    elif os.path.isdir(caminho):
+                        shutil.rmtree(caminho)
+                        arquivos_removidos += 1
+                        removidos.append(arquivo + "/")
+                except Exception as e:
+                    self.log(f"Erro ao deletar {caminho}: {e}")
+                atual += 1
+                progress = atual / total if total > 0 else 1
+                self.status_var.set(f"Limpando temporários... ({atual}/{total})")
+                self.root.update_idletasks()
+        self.status_var.set("Limpeza concluída.")
+        if arquivos_removidos == 0:
+            self.log("Nenhum arquivo temporário removido.")
+        else:
+            self.log(f"Foram removidos {arquivos_removidos} arquivos/pastas temporários:\n" + "\n".join(removidos))
 
-ctk.CTkLabel(
-    welcome_frame,
-    text="Organize seus arquivos facilmente escolhendo onde cada tipo deve ser salvo.",
-    font=("Arial", 16),
-    text_color="#444"
-).pack(pady=2)
-
-# Frame para seleção da pasta de origem
-frame_origem = ctk.CTkFrame(root)
-frame_origem.pack(pady=10, padx=10, fill="x")
-ctk.CTkLabel(frame_origem, text="Pasta a organizar:", font=("Arial", 14)).pack(side=tk.LEFT, padx=5)
-ctk.CTkEntry(frame_origem, textvariable=entrada_origem, width=350, font=("Arial", 13)).pack(side=tk.LEFT, padx=5)
-ctk.CTkButton(frame_origem, text="Escolher", command=escolher_pasta_origem).pack(side=tk.LEFT, padx=5)
-
-frame_categorias = ctk.CTkFrame(root)
-frame_categorias.pack(padx=10, pady=10, fill="x")
-ctk.CTkLabel(
-    frame_categorias,
-    text="Configuração dos destinos por categoria",
-    font=("Arial", 16, "bold")
-).pack(anchor="w", pady=5)
-
-for cat in categorias:
-    frame = ctk.CTkFrame(frame_categorias)
-    frame.pack(fill="x", pady=4, padx=5)
-    ctk.CTkLabel(frame, text=cat, width=90, font=("Arial", 13)).pack(side=tk.LEFT, padx=2)
-    campos_caminho[cat] = ctk.CTkLabel(frame, text="(Nenhum destino escolhido)", width=220, anchor="w", font=("Arial", 12))
-    campos_caminho[cat].pack(side=tk.LEFT, padx=5)
-    ctk.CTkButton(frame, text="Escolher destino", width=120, command=lambda c=configs[cat]: escolher_destino(c)).pack(side=tk.LEFT, padx=5)
-    ctk.CTkRadioButton(frame, text="Subpasta", variable=configs[cat].tipo, value="subpasta").pack(side=tk.LEFT, padx=2)
-    ctk.CTkRadioButton(frame, text="Nova pasta", variable=configs[cat].tipo, value="nova_pasta").pack(side=tk.LEFT, padx=2)
-
-progress_var = tk.DoubleVar(value=0)
-
-progress_bar = ctk.CTkProgressBar(root, variable=progress_var, width=500, height=20)
-progress_bar.pack(pady=10)
-progress_bar.set(0)
-
-ctk.CTkButton(
-    root,
-    text="Organizar arquivos",
-    command=iniciar_organizacao,
-    font=("Arial", 18, "bold"),
-    fg_color="#2563eb",
-    hover_color="#18e733",
-    height=45,
-    width=220
-).pack(pady=15)
-
-# Botão para limpeza de arquivos temporários
-ctk.CTkButton(
-    root,
-    text="Limpar arquivos temporários",
-    command=limpar_temporarios,
-    font=("Arial", 15, "bold"),
-    fg_color="#eab308",
-    hover_color="#ca8a04",
-    height=40,
-    width=220
-).pack(pady=5)
-
-root.mainloop()
+if __name__ == "__main__":
+    root = ctk.CTk()
+    app = OrganizadorApp(root)
+    root.mainloop()
