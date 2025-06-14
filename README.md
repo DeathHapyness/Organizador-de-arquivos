@@ -1,44 +1,45 @@
-# 🗂️ Organizador de Arquivos - Automação para Limpeza e Organização
+# 🗂️ File Organizer - Automation for Cleaning and Organizing
 
-## Descrição
+## Description
 
-Este projeto em **Python** automatiza a limpeza e organização de arquivos temporários e desnecessários no seu computador, ajudando a liberar espaço e manter o sistema mais leve e rápido. O programa conta com uma interface gráfica moderna construída com **customtkinter**, facilitando o uso por qualquer pessoa.
+This **Python** project automates the cleaning and organization of temporary and unnecessary files on your computer, helping to free up space and keep your system lighter and faster. The program features a modern graphical interface built with **customtkinter**, making it user-friendly for anyone.
 
-Além disso, o projeto pode ser empacotado em um executável .exe para Windows usando o **PyInstaller**, permitindo rodar o programa sem necessidade de instalar o Python.
-
----
-
-##  Funcionalidades
-
-- 🧹 Exclusão automática de arquivos temporários e caches.  
-- 🖥️ Interface gráfica com barra de progresso e mensagens claras.  
-- 📦 Empacotamento em um único executável Windows.  
-- 🎨 Personalização do ícone do executável para identidade visual própria.
+Additionally, the project can be packaged into a `.exe` executable for Windows using **PyInstaller**, allowing the program to run without requiring Python installation.
 
 ---
 
-## 📌 Requisitos
+## Features
 
-Para rodar o programa no modo desenvolvimento (com Python):
-
--  **Python 3.7 ou superior** (recomendado 3.10+).  
--  **Bibliotecas Python:**  
-  - customtkinter (interface gráfica)  
-  - Outras bibliotecas padrão usadas pelo programa.
-
-- 🔧 **PyInstaller** (para gerar o executável .exe).
+- 🧹 Automatic deletion of temporary files and caches.  
+- 🖥️ Graphical interface with progress bar and clear status messages.  
+- 📦 Packaged as a single executable for Windows.  
+- 🎨 Customizable executable icon for branding purposes.
 
 ---
 
-## 🚀 Instalação e Configuração
+## 📌 Requirements
 
-### 1. Instalar Python
+To run the program in development mode (with Python):
 
-- Baixe e instale a versão recomendada do [Python oficial](https://www.python.org/downloads/).  
-- Durante a instalação, **marque a opção para adicionar Python ao PATH**.
+- **Python 3.7 or higher** (3.10+ recommended).  
+- **Python Libraries:**  
+  - `customtkinter` (for the GUI)  
+  - Other standard libraries used in the program.
 
-### 2. Obter o código
+- 🔧 **PyInstaller** (to generate the `.exe` file).
 
-bash
-git clone https://github.com/seu_usuario/seu_repositorio.git
-cd seu_repositorio 
+---
+
+## 🚀 Installation and Setup
+
+### 1. Install Python
+
+- Download and install the recommended version from the [official Python website](https://www.python.org/downloads/).  
+- During installation, **check the box to add Python to PATH**.
+
+### 2. Get the code
+
+```bash
+git clone https://github.com/your_username/your_repository.git
+cd your_repository
+
