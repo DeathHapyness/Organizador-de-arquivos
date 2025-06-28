@@ -4,6 +4,12 @@ import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk
 import tempfile
+import threading
+import time
+import json
+from tkinter import filedialog
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # Categorias e extensões
 categorias = {
@@ -20,21 +26,102 @@ class OrganizadorApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Organizador de Arquivos Automático")
-        self.root.geometry("720x700")
-        ctk.set_appearance_mode("system")
-        ctk.set_default_color_theme("blue")
-
-        # Caminhos fixos: Downloads como origem, subpasta como destino
-        downloads = os.path.join(os.path.expanduser("~"), "Downloads")
-        self.pasta_origem = downloads
-        self.pasta_destino = os.path.join(downloads, "Organizados")
-
-        self.status_var = tk.StringVar(value="Aguardando ação...")
+        self.root.geometry("900x800")
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("green")
+        self.config_file = os.path.join(os.path.expanduser("~"), ".organizador_config.json")
+        self.pasta_origem = self.carregar_preferencias().get("pasta_origem", os.path.join(os.path.expanduser("~"), "Downloads"))
+        self.pasta_destino = os.path.join(self.pasta_origem, "Organizados")
+        self.status_var = tk.StringVar(value="Bem-vindo! Pronto para organizar seus arquivos.")
         self.log_text = None
-
+        self.log_file = os.path.join(self.pasta_destino, "log_organizacao.txt")
+        self.log_visible = False
         self._build_interface()
+        self.root.after(1000, self.iniciar_organizacao)
+        self._agendar_organizacao_periodica()
+
+    def carregar_preferencias(self):
+        if os.path.exists(self.config_file):
+            try:
+                with open(self.config_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def salvar_preferencias(self):
+        prefs = {"pasta_origem": self.pasta_origem}
+        try:
+            with open(self.config_file, "w", encoding="utf-8") as f:
+                json.dump(prefs, f)
+        except Exception:
+            pass
+
+    def escolher_pasta(self):
+        pasta = filedialog.askdirectory(title="Escolha a pasta para organizar")
+        if pasta:
+            self.pasta_origem = pasta
+            self.pasta_destino = os.path.join(pasta, "Organizados")
+            self.salvar_preferencias()
+            self.status_var.set(f"Nova pasta selecionada: {pasta}")
+
+    def mostrar_grafico(self):
+        contagem = self.contagem_arquivos_por_categoria()
+        fig, ax = plt.subplots(figsize=(5, 4))
+        categorias_labels = list(contagem.keys())
+        valores = list(contagem.values())
+        ax.pie(valores, labels=categorias_labels, autopct='%1.1f%%', startangle=140)
+        ax.set_title('Distribuição dos Arquivos Organizados')
+        win = tk.Toplevel(self.root)
+        win.title("Relatório Visual")
+        canvas = FigureCanvasTkAgg(fig, master=win)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+
+    def contagem_arquivos_por_categoria(self):
+        resultado = {cat: 0 for cat in categorias}
+        if not os.path.exists(self.pasta_destino):
+            return resultado
+        for cat in categorias:
+            pasta_cat = os.path.join(self.pasta_destino, cat)
+            if os.path.exists(pasta_cat):
+                resultado[cat] = len([f for f in os.listdir(pasta_cat) if os.path.isfile(os.path.join(pasta_cat, f))])
+        return resultado
+
+    def mostrar_ajuda(self):
+        msg = ("Bem-vindo ao Organizador de Arquivos!\n\n" 
+               "- Clique em 'Escolher Pasta' para selecionar qualquer pasta para organizar.\n"
+               "- Use 'Relatório Visual' para ver um gráfico dos arquivos organizados.\n"
+               "- O log mostra tudo que acontece, clique em 'Ver Log'.\n"
+               "- Limpe cache e temporários com os botões apropriados.\n"
+               "- Suas preferências são salvas automaticamente.\n\n"
+               "Dúvidas? Entre em contato!")
+        messagebox.showinfo("Ajuda", msg)
+
+    def _agendar_organizacao_periodica(self):
+        def agendar():
+            while True:
+                time.sleep(600)  
+                self.root.after(0, self.iniciar_organizacao)
+        t = threading.Thread(target=agendar, daemon=True)
+        t.start()
 
     def _build_interface(self):
+        # Título estilizado
+        ctk.CTkLabel(self.root, text="Organizador de Arquivos", font=("Arial Black", 28, "bold"), text_color="#22d3ee").pack(pady=10)
+
+        # Botão escolher pasta
+        ctk.CTkButton(
+            self.root,
+            text="Escolher Pasta",
+            command=self.escolher_pasta,
+            font=("Arial", 15, "bold"),
+            fg_color="#a3e635",
+            hover_color="#65a30d",
+            height=40,
+            width=220
+        ).pack(pady=5)
+
         # Botão organizar
         ctk.CTkButton(
             self.root,
@@ -44,22 +131,44 @@ class OrganizadorApp:
             fg_color="#2563eb",
             hover_color="#18e733",
             height=45,
-            width=350
-        ).pack(pady=15)
+            width=400
+        ).pack(pady=10)
 
-        # Status label
-        self.status_label = ctk.CTkLabel(self.root, textvariable=self.status_var, font=("Arial", 14, "italic"), text_color="#666")
-        self.status_label.pack(pady=5)
+        # Botão relatório visual
+        ctk.CTkButton(
+            self.root,
+            text="Relatório Visual",
+            command=self.mostrar_grafico,
+            font=("Arial", 15, "bold"),
+            fg_color="#fbbf24",
+            hover_color="#f59e42",
+            height=40,
+            width=220
+        ).pack(pady=5)
 
-        # Campo log (Text widget)
-        log_frame = ctk.CTkFrame(self.root)
-        log_frame.pack(pady=10, padx=10, fill="both", expand=True)
-        ctk.CTkLabel(log_frame, text="Log de Ações:", font=("Arial", 16, "bold")).pack(anchor="w", pady=5)
-        self.log_text = tk.Text(log_frame, height=15, state="disabled", font=("Consolas", 11))
-        self.log_text.pack(fill="both", expand=True)
+        # Botão ajuda
+        ctk.CTkButton(
+            self.root,
+            text="Ajuda",
+            command=self.mostrar_ajuda,
+            font=("Arial", 15, "bold"),
+            fg_color="#38bdf8",
+            hover_color="#0ea5e9",
+            height=40,
+            width=220
+        ).pack(pady=5)
 
-        # Botão limpar log
-        ctk.CTkButton(self.root, text="Limpar log", command=self.limpar_log, width=120).pack(pady=5)
+        # Botão limpar cache
+        ctk.CTkButton(
+            self.root,
+            text="Limpar Cache",
+            command=self.limpar_cache,
+            font=("Arial", 15, "bold"),
+            fg_color="#f472b6",
+            hover_color="#be185d",
+            height=40,
+            width=220
+        ).pack(pady=5)
 
         # Botão limpar temporários
         ctk.CTkButton(
@@ -73,13 +182,75 @@ class OrganizadorApp:
             width=220
         ).pack(pady=5)
 
+        # Botão mostrar/ocultar log
+        ctk.CTkButton(
+            self.root,
+            text="Ver Log",
+            command=self.toggle_log,
+            font=("Arial", 15, "bold"),
+            fg_color="#22d3ee",
+            hover_color="#0ea5e9",
+            height=40,
+            width=220
+        ).pack(pady=5)
+
+        # Status label
+        self.status_label = ctk.CTkLabel(self.root, textvariable=self.status_var, font=("Arial", 16, "italic"), text_color="#a3e635")
+        self.status_label.pack(pady=10)
+
+        # Frame do log (inicialmente oculto)
+        self.log_frame = ctk.CTkFrame(self.root)
+        ctk.CTkLabel(self.log_frame, text="Log de Ações:", font=("Arial", 16, "bold"), text_color="#fbbf24").pack(anchor="w", pady=5)
+        self.log_text = tk.Text(self.log_frame, height=15, state="disabled", font=("Consolas", 11), bg="#18181b", fg="#fbbf24")
+        self.log_text.pack(fill="both", expand=True)
+        ctk.CTkButton(self.log_frame, text="Limpar log", command=self.limpar_log, width=120, fg_color="#ef4444", hover_color="#b91c1c").pack(pady=5)
+
+    def toggle_log(self):
+        if self.log_visible:
+            self.log_frame.pack_forget()
+            self.log_visible = False
+        else:
+            self.log_frame.pack(pady=10, padx=10, fill="both", expand=True)
+            self.log_visible = True
+
+    def limpar_cache(self):
+        self.log("Limpando cache do sistema...")
+        pastas_cache = [
+            os.path.expandvars(r"%USERPROFILE%\\AppData\\Local\\Microsoft\\Windows\\INetCache"),
+            os.path.expandvars(r"%USERPROFILE%\\AppData\\Local\\Temp\\Cache"),
+        ]
+        removidos = 0
+        for pasta in pastas_cache:
+            if os.path.exists(pasta):
+                for arquivo in os.listdir(pasta):
+                    caminho = os.path.join(pasta, arquivo)
+                    try:
+                        if os.path.isfile(caminho):
+                            os.remove(caminho)
+                            removidos += 1
+                        elif os.path.isdir(caminho):
+                            shutil.rmtree(caminho)
+                            removidos += 1
+                    except Exception as e:
+                        self.log(f"Erro ao deletar {caminho}: {e}")
+        if removidos == 0:
+            self.log("Nenhum arquivo de cache removido.")
+        else:
+            self.log(f"Cache limpo: {removidos} arquivos/pastas removidos.")
+
     def log(self, texto):
         self.status_var.set(texto)
-        self.log_text.config(state="normal")
-        self.log_text.insert(tk.END, texto + "\n")
-        self.log_text.see(tk.END)
-        self.log_text.config(state="disabled")
+        if self.log_visible:
+            self.log_text.config(state="normal")
+            self.log_text.insert(tk.END, texto + "\n")
+            self.log_text.see(tk.END)
+            self.log_text.config(state="disabled")
         self.root.update_idletasks()
+        try:
+            with open(self.log_file, "a", encoding="utf-8") as f:
+                f.write(texto + "\n")
+        except Exception:
+            pass
 
     def organizar_pasta(self):
         origem = self.pasta_origem
